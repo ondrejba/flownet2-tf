@@ -82,11 +82,9 @@ class Net(object):
                 full_out_path = os.path.join(out_path, unique_name + '.flo')
                 write_flow(pred_flow, full_out_path)
 
-
-    def get_sess_and_flow_op(self, checkpoint):
-
-        input_a_pl = tf.placeholder(tf.float32, (1, 384, 512, 3))
-        input_b_pl = tf.placeholder(tf.float32, (1, 384, 512, 3))
+    def get_flow_op(self, batch_size):
+        input_a_pl = tf.placeholder(tf.float32, (batch_size, 384, 512, 3))
+        input_b_pl = tf.placeholder(tf.float32, (batch_size, 384, 512, 3))
 
         inputs = {
             "input_a": input_a_pl,
@@ -95,12 +93,28 @@ class Net(object):
         predictions = self.model(inputs, LONG_SCHEDULE)
         pred_flow = predictions['flow']
 
+        return input_a_pl, input_b_pl, pred_flow
+
+    def get_flow_op_graph(self, input_a, input_b):
+
+        inputs = {
+            "input_a": input_a,
+            "input_b": input_b
+        }
+        predictions = self.model(inputs, LONG_SCHEDULE)
+        pred_flow = predictions['flow']
+
+        return pred_flow
+
+    def get_session(self, checkpoint):
         saver = tf.train.Saver()
         sess = tf.Session()
 
-        saver.restore(sess, checkpoint)
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
 
-        return input_a_pl, input_b_pl, pred_flow, sess
+        saver.restore(sess, checkpoint)
+        return sess
 
     def train(self, log_dir, training_schedule, input_a, input_b, flow, checkpoints=None):
         tf.summary.image("image_a", input_a, max_outputs=2)
