@@ -4,7 +4,7 @@ import os
 import tensorflow as tf
 from .flowlib import flow_to_image, write_flow
 import numpy as np
-from scipy.misc import imread, imsave
+from scipy.misc import imread, imsave, imresize
 import uuid
 from .training_schedules import LONG_SCHEDULE
 slim = tf.contrib.slim
@@ -42,6 +42,10 @@ class Net(object):
         input_a = imread(input_a_path)
         input_b = imread(input_b_path)
 
+        # resize images
+        input_a = imresize(input_a, (384, 512))
+        input_b = imresize(input_b, (384, 512))
+
         # Convert from RGB -> BGR
         input_a = input_a[..., [2, 1, 0]]
         input_b = input_b[..., [2, 1, 0]]
@@ -77,6 +81,26 @@ class Net(object):
             if save_flo:
                 full_out_path = os.path.join(out_path, unique_name + '.flo')
                 write_flow(pred_flow, full_out_path)
+
+
+    def get_sess_and_flow_op(self, checkpoint):
+
+        input_a_pl = tf.placeholder(tf.float32, (1, 384, 512, 3))
+        input_b_pl = tf.placeholder(tf.float32, (1, 384, 512, 3))
+
+        inputs = {
+            "input_a": input_a_pl,
+            "input_b": input_b_pl
+        }
+        predictions = self.model(inputs, LONG_SCHEDULE)
+        pred_flow = predictions['flow']
+
+        saver = tf.train.Saver()
+        sess = tf.Session()
+
+        saver.restore(sess, checkpoint)
+
+        return input_a_pl, input_b_pl, pred_flow, sess
 
     def train(self, log_dir, training_schedule, input_a, input_b, flow, checkpoints=None):
         tf.summary.image("image_a", input_a, max_outputs=2)
